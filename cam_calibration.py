@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numpy as np
 import cv2
 import glob
@@ -12,9 +13,11 @@ imgpoints = []
 
 images = glob.glob('*.jpg')
 
-for fname in images:
+for frame in images:
   img = cv2.imread(frame)
-  gray = cv2.findChessboardCorners(gray, (7,6),None)
+  gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+  ret, corners = cv2.findChessboardCorners(gray, (7,6),None)
 
   if ret == True:
     objpoints.append(objp)
