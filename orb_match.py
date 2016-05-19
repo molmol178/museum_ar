@@ -55,7 +55,7 @@ while(True):
   matches = sorted(matches, key = lambda x:x.distance)
 
   # Draw first 10 matches.
-  img3 = drawMatches(gray,kp1,gray2,kp2,matches[:100])
+  img3 = drawMatches(gray,kp1,gray2,kp2,matches[:30])
 
   if cv2.waitKey(1) & 0xFF == ord('q'):
     break
