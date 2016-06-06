@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import cv2
-import pylab as plt
+import matplotlib.pyplot as plt
 import math
 import csv
+from collections import Counter
 
-input_img = cv2.imread('input_sika.png',1)
-template = cv2.imread('input_sika.png',1)
+input_img = cv2.imread('input_yaziri.png',1)
+template = cv2.imread('template_yaziri.png',1)
 
 #RGBからHSVに変換
 def rgb2Hsv(input_img, template):
@@ -71,12 +72,17 @@ def createInputLabelImage(input_hsv):
   #inputのtemplateに対する偏差値を求め補正結果を配列に格納
   correct_input_list = np.zeros(256)
   for iii in xrange(0, 256):
-    deveation = template_std_deviation * (input_v_count_list[iii] - ave_i) / input_std_deviation + ave_t
-    correct_input_list[iii] = deveation
+    correct_input_list[iii] = template_std_deviation * ((input_v_count_list[iii] - ave_i) / input_std_deviation) + ave_t
   print 'correct_input_list\n' + str(correct_input_list)
   f_corre_in = open('correct_input_hist.csv', 'w')
   csvWriter = csv.writer(f_corre_in)
   csvWriter.writerow(correct_input_list)
+
+  plt.plot(input_v_count_list, label = "input hist")
+  plt.plot(correct_input_list, label = "correct input")
+  plt.legend()
+  plt.savefig('input_hist.png')
+
 
   #ヒストグラムは確認のために必要なだけで、処理には必要ない。偏差値の処理は画素１つずつ行ってラベル画像を作る。
   correct_input_v_value = np.zeros((input_y, input_x), np.uint8)
@@ -86,7 +92,6 @@ def createInputLabelImage(input_hsv):
       correct_input_v_value[co_in_y, co_in_x] = template_std_deviation * (input_v_value[co_in_y, co_in_x] - ave_i) / input_std_deviation + ave_t
   print 'correct_input_v_value\n' + str(correct_input_v_value)
   cv2.imwrite('correct_input_v_value.png', correct_input_v_value)
-  #print 'correct_input_v_value' + str(correct_input_v_value)
 
   #作成した領域ラベルリスト(label_list.csvを読み込む)を用いてinputラベル画像生成
   label_input_img = np.zeros((input_y, input_x), np.uint8)
@@ -105,7 +110,7 @@ def createInputLabelImage(input_hsv):
 def featureDetection(label_template_img):
   #3*3の四角のフィルターでinput全体を走査して３次元配列をつくる
   y_size, x_size = label_template_img.shape[:2]
-  n = 11 #n=3 or 5 or 7 or 11 ...
+  n = 5 #n=3 or 5 or 7 or 11 ...
   one_n = n + 2*(n-1) + n-2 # n=3の時8,n=5の時16,n=7の時24,n=11の時32
   scanning_filter = np.zeros((n,n),np.uint8)
   scan_y = len(scanning_filter)
@@ -117,55 +122,81 @@ def featureDetection(label_template_img):
   for y in xrange(0,y_size - scan_y,n):
     for x in xrange(0,x_size - scan_x,n):
       one_dimention_scanning = np.zeros(one_n, np.uint8)
+      scanning_center = []
       for s_y in xrange(scan_y):
         for s_x in xrange(scan_x):
           scanning_filter[s_y, s_x] = label_template_img[s_y + y, s_x + x]
           #周の要素だけ取り出して１次元配列にする
           if n == 3:
             one_dimention_scanning = [scanning_filter[0,0],scanning_filter[0,1],scanning_filter[0,2],scanning_filter[1,2],scanning_filter[2,2],scanning_filter[2,1],scanning_filter[2,0],scanning_filter[1,0]]
+            scanning_center = [scanning_filter[1,1]]
           if n == 5:
             one_dimention_scanning = [scanning_filter[0,0],scanning_filter[0,1],scanning_filter[0,2],scanning_filter[0,3],scanning_filter[0,4],scanning_filter[1,4],scanning_filter[2,4],scanning_filter[3,4],scanning_filter[4,4],scanning_filter[4,3],scanning_filter[4,2],scanning_filter[4,1],scanning_filter[4,0],scanning_filter[3,0],scanning_filter[2,0],scanning_filter[1,0]]
+            scanning_center = [scanning_filter[2,2]]
           if n == 7:
             one_dimention_scanning = [scanning_filter[0,0],scanning_filter[0,1],scanning_filter[0,2],scanning_filter[0,3],scanning_filter[0,4],scanning_filter[0,5],scanning_filter[0,6],scanning_filter[1,6],scanning_filter[2,6],scanning_filter[3,6],scanning_filter[4,6],scanning_filter[5,6],scanning_filter[6,6],scanning_filter[6,5],scanning_filter[6,4],scanning_filter[6,3],scanning_filter[6,2],scanning_filter[6,1],scanning_filter[6,0],scanning_filter[5,0],scanning_filter[4,0],scanning_filter[3,0],scanning_filter[2,0],scanning_filter[1,0]]
+            scanning_center = [scanning_filter[4,4]]
           if n == 11:
             one_dimention_scanning = [scanning_filter[0,0],scanning_filter[0,1],scanning_filter[0,2],scanning_filter[0,3],scanning_filter[0,4],scanning_filter[0,5],scanning_filter[0,6],scanning_filter[0,7],scanning_filter[0,8],scanning_filter[0,9],scanning_filter[0,10],scanning_filter[1,10],scanning_filter[2,10],scanning_filter[3,10],scanning_filter[4,10],scanning_filter[5,10],scanning_filter[6,10],scanning_filter[7,10],scanning_filter[8,10],scanning_filter[9,10],scanning_filter[10,10],scanning_filter[10,9],scanning_filter[10,8],scanning_filter[10,7],scanning_filter[10,6],scanning_filter[10,5],scanning_filter[10,4],scanning_filter[10,3],scanning_filter[10,2],scanning_filter[10,1],scanning_filter[10,0],scanning_filter[9,0],scanning_filter[8,0],scanning_filter[7,0],scanning_filter[6,0],scanning_filter[5,0],scanning_filter[4,0],scanning_filter[3,0],scanning_filter[2,0],scanning_filter[1,0]]
-          #print 'y = ' +str(y)
-          #print 'x = ' +str(x)
-          #print 's_y = ' +str(s_y)
-          #print 's_x = ' +str(s_x)
-      #print 'scanning_filter\n' + str(scanning_filter)
-      #print 'one_dimention_scanning\n' + str(one_dimention_scanning)
+            scanning_center = [scanning_filter[5,5]]
       one_d_count = 0
       for one_d in xrange(len(one_dimention_scanning) - 1):
-        #print 'one_d = ' + str(one_d)
         #要素の切れ目を数える
         if one_dimention_scanning[one_d] != one_dimention_scanning[one_d + 1]:
           one_d_count += 1
-          #print 'one_d_count = ' + str(one_d_count)
+      #連続するラベルの数を数える
+      counter =  Counter(one_dimention_scanning)
+      word_list = []
+      cnt_list = []
+      for word, cnt in counter.most_common():
+        word_list.append(word)
+        cnt_list.append(cnt)
+      #print 'word_list' + str(word_list)
+      #print 'cnt_list' + str(cnt_list)
+      #要素の切れ目が１の時
+      if one_d_count == 1:
+        element_check = []
+        element_check = set(one_dimention_scanning)
+        #要素数が2かどうかチェック、短い方のラベルが中心画素と同じ
+        if len(element_check) == 2 and scanning_center == word_list[cnt_list.index(np.min(cnt_list))]:
+          #短い方のラベルが120度以下の時
+          if np.min(cnt_list) <= one_n / 3:
+            if np.min(cnt_list) >= 3:
+              print '切れ目１要素2 = ' + str(one_dimention_scanning)
+              print 'scanning_center = ' +str(scanning_center)
+              sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
+              sum_xy = np.vstack((sum_xy,[y/2,x/2]))
       #要素の切れ目が2の時
-      if one_d_count == 2:
+      elif one_d_count == 2:
         #要素数が３かどうかチェックする
         element_check = []
         element_check = set(one_dimention_scanning)
-        #print 'element_check' + str(len(element_check))
         if len(element_check) == 3:
-          #print 'one_d_count = ' + str(one_d_count)
-          #print 'x = ' + str(x)
-          #print 'y = ' + str(y)
-          sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
-          sum_xy = np.vstack((sum_xy,[x,y]))
-          #print 'sum_one_dimention_scanning = ' + str(sum_one_dimention_scanning)
-          #print 'sum_xy = ' + str(sum_xy)
+          #連続するラベルの数が２以上の時
+          if np.min(cnt_list) >= 3:
+            sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
+            sum_xy = np.vstack((sum_xy,[y/2,x/2]))
+            #print 'get   cnt_list = ' + str(cnt_list)
+            #print 'one_dimention_scanning = ' + str(one_dimention_scanning)
+        #要素の切れ目が2で最初と最後の要素がおなじ,短い方のラベルが中心画素と同じ
+        if one_dimention_scanning[0] == one_dimention_scanning[-1] and scanning_center == word_list[cnt_list.index(np.min(cnt_list))]:
+          #短い方のラベルが120度以下の時
+          if np.min(cnt_list) <= one_n / 3:
+            if np.min(cnt_list) >= 3:
+              print '切れ目2要素2 = '+ str(one_dimention_scanning)
+              print 'scanning_center = ' +str(scanning_center)
+              sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
+              sum_xy = np.vstack((sum_xy,[y/2,x/2]))
+
       elif one_d_count == 3:
         if one_dimention_scanning[0] == one_dimention_scanning[-1]:
           #要素の切れ目が３の時は、最初と最後が同じなら要素数は３なので、キーポイントとする
-          #print 'one_d_count = ' + str(one_d_count)
-          #print 'x = ' + str(x)
-          #print 'y = ' + str(y)
-          sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
-          sum_xy = np.vstack((sum_xy,[x,y]))
-          #print 'sum_one_dimention_scanning = ' + str(sum_one_dimention_scanning)
-          #print 'sum_xy = ' + str(sum_xy)
+          #連続するラベルの数が２以上の時
+          if np.min(cnt_list) >= 3:
+            sum_one_dimention_scanning = np.vstack((sum_one_dimention_scanning,one_dimention_scanning))
+            sum_xy = np.vstack((sum_xy,[y/2,x/2]))
+            #print 'get  cnt_list = ' + str(cnt_list)
+            #print 'one_dimention_scanning = ' + str(one_dimention_scanning)
   return (sum_one_dimention_scanning, sum_xy)
 
 #inputとtemplateのバイナリ化
@@ -187,18 +218,12 @@ def featureDescription(sum_scanning):
   print 'element check label = ' + str(element_check_label)
   #label_listの種類の長さ分の１次元リストを作る（keypoint_binary）
   keypoint_binary = np.zeros((len(sum_scanning),len(element_check_label)),np.uint8)
-  #print 'len(element_check_label)' + str(len(element_check_label))
-  #print 'len(sum_scanning)' + str(len(sum_scanning))
-  #print 'len(sum_xy)' + str(len(sum_xy))
-  #print 'keypoint_binary\n' + str(keypoint_binary)
-  #print 'keypoint_xy\n' + str(keypoint_xy)
   #one_dimention_scanningの頭から走査してその値のkeypoint_binaryのインデックスに＋１する
   print 'sum_scanning\n' + str(sum_scanning)
   print 'len(sum_scanning[0])' + str(len(sum_scanning[0]))
   for y in xrange(len(sum_scanning)):
     for x in xrange(len(sum_scanning[0])):
       #すでに１が入っていたらone_dimention_scanningのカーソルを次に渡す
-      #print 'sum_scanning[y,x] = ' + str(sum_scanning[y,x])
       if keypoint_binary[y,sum_scanning[y,x]] == 0:
         keypoint_binary[y,sum_scanning[y,x]] = 1
   #keypoint_binaryを二次元リストに保存する
@@ -211,11 +236,6 @@ inputとtemplateのバイナリのハミング距離を取ってマッチング
 '''
 def featureMatching(input_keypoint_list, input_xy_list, input_img, template_img):
   #inputとtemplateのkeypoint_binary,xy_listを読み込む
-  print 'y input_img = ' + str(len(input_img))
-  print 'x input_img = ' + str(len(input_img[0]))
-  print 'y template_img = ' + str(len(template_img))
-  print 'x template_img = ' + str(len(template_img[0]))
-  print 'dim template_img = ' + str(len(template_img.shape))
   template_keypoint_list = []
   template_keypoint = csv.reader(open('template_keypoint_binary.csv', 'r'))
   for temp_key in template_keypoint:
@@ -224,48 +244,31 @@ def featureMatching(input_keypoint_list, input_xy_list, input_img, template_img)
   template_xy = csv.reader(open('template_keypoint_xy.csv', 'r'))
   for temp_xy in template_xy:
     template_xy_list.append(map(int,temp_xy))
-  #print 'input_keypoint_list\n' +str(input_keypoint_list)
-  #print 'input_xy_list\n' +str(input_xy_list)
-  #print 'template_keypoint_list\n' +str(template_keypoint_list)
-  #print 'template_xy_list\n' +str(template_xy_list)
-  #print 'input len = ' +str(len(input_keypoint_list[0]))
-  #print 'template len = ' +str(len(template_keypoint_list[0]))
-  print 'input_img\n' + str(input_img)
   x_sum_img = len(input_img[0]) + len(template_img[0])
   sum_img = np.zeros((len(input_img), x_sum_img), np.uint8)
-  print 'y sum_img = ' + str(len(sum_img))
-  print 'x sum_img = ' + str(len(sum_img[0]))
   sum_img = np.hstack((input_img, template_img))
   template_add_xsize = []
   #ハミング距離をとって0になったらマッチングとする
   for temp_y in xrange(0,len(template_keypoint_list)):
     for inp_y in xrange(0,len(input_keypoint_list)):
       calc_list = template_keypoint_list[temp_y] - input_keypoint_list[inp_y]
-      #print 'calc_list = '+ str(calc_list)
+      print 'template_xy' + str(template_xy_list[temp_y])
+      print 'input_xy' + str(input_xy_list[inp_y])
       if  all((x == 0 for x in calc_list)) == True:
-        #print 'get matching!!!!!'
         #マッチングした時のkeypoint_bineryと同じ場所のx,yの値を画像平面上にマッピングし、結果を出力
-        #print 'template pixcel' + str(template_xy_list[temp_y])
-        #print 'input pixcel' + str(input_xy_list[inp_y])
+        #print 'get match'
         temp_xy = template_xy_list[temp_y]
-        #print 'temp_xy = ' + str(temp_xy)
-        template_add_xsize = [temp_xy[0] + len(input_img[0]), temp_xy[1]]
-        #print 'template_add_xsize = ' + str(template_add_xsize)
-        add_input = tuple(input_xy_list[inp_y])
+        inp_xy = input_xy_list[inp_y]
+        template_add_xsize = [temp_xy[1] + len(input_img[0]),temp_xy[0]]
+        input_change_xy = [inp_xy[1],inp_xy[0]]
+        add_input = tuple(input_change_xy)
         add_template = tuple(template_add_xsize)
-        cv2.circle(sum_img,add_input,5,(255,255,255),-1)
-        cv2.circle(sum_img,add_template,5,(0,0,0),-1)
-        #cv2.line(sum_img,add_input,add_template,(0,255,255),1)
-        #print 'input_img\n' + str(input_img)
+        cv2.circle(sum_img,add_input,3,(0,0,0),-1)
+        cv2.circle(sum_img,add_template,3,(0,0,255),-1)
+        #cv2.line(sum_img,add_input,add_template,(255,255,0),1)
+        #print 'add_input = ' +str(add_input) + ' add_template = ' +str(add_template)
   print 'quit calc'
   cv2.imwrite('sum_img.tif', sum_img)
-  '''
-  while(True):
-    cv2.imshow('sum_img', sum_img)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-      break
-  cv2.destroyAllWindows()
-  '''
 
 #main
 input_hsv, template_hsv = rgb2Hsv(input_img, template)
